@@ -550,7 +550,7 @@ static gboolean spotify_create_session (GstSpotSrc *spot)
   config.user_agent = "spotify-gstreamer-src";
   config.callbacks = &g_callbacks;
 
-  error = sp_session_init (&config, &GST_SPOT_SRC_SPOTIFY_SESSION (spot));
+  error = sp_session_create (&config, &GST_SPOT_SRC_SPOTIFY_SESSION (spot));
 
   if (SP_ERROR_OK != error) {
     GST_ERROR_OBJECT (spot, "Failed to create spotify_session: %s", sp_error_message (error));
@@ -582,7 +582,12 @@ static gboolean spotify_login (GstSpotSrc *spot)
   GST_DEBUG_OBJECT (spot, "Trying to login");
 
   /* login using the credentials given on the command line */
-  error = sp_session_login (GST_SPOT_SRC_SPOTIFY_SESSION (spot), GST_SPOT_SRC_USER (spot), GST_SPOT_SRC_PASS (spot));
+  const char * blob = "sdf";
+  error = sp_session_login (GST_SPOT_SRC_SPOTIFY_SESSION (spot)
+			    , GST_SPOT_SRC_USER (spot)
+			    , GST_SPOT_SRC_PASS (spot)
+			    , 0
+			    , blob);
 
   if (SP_ERROR_OK != error) {
     GST_ERROR_OBJECT (spot, "Failed to login: %s", sp_error_message (error));
@@ -710,16 +715,14 @@ spotify_thread_func (void *data)
           break;
 
         case SPOT_CMD_DURATION:
+	  error = SP_ERROR_OK;
           if (GST_SPOT_SRC_CURRENT_TRACK (spot)) {
             int dur = sp_track_duration (GST_SPOT_SRC_CURRENT_TRACK (spot));
             if (dur == 0){
-              error = SP_ERROR_RESOURCE_NOT_LOADED;
+	      error = SP_ERROR_TRACK_NOT_PLAYABLE;
             }
             spot_work->retval = dur;
-            
-
-          }
-	  error = SP_ERROR_OK;
+          } 
           break;
 
         case SPOT_CMD_STOP:
@@ -745,9 +748,35 @@ spotify_thread_func (void *data)
 
 	    GST_DEBUG_OBJECT (spot, "Doing a search on %s", s_s->query);
 
-	    search = sp_search_create(GST_SPOT_SRC_SPOTIFY_SESSION (spot), s_s->query,
-				      s_s->artist_index, s_s->artist_nbr, s_s->album_index,
-				      s_s->album_nbr, 0, 0, &spotify_cb_search_complete, s_s);
+	    search = sp_search_create(GST_SPOT_SRC_SPOTIFY_SESSION (spot)
+				      , s_s->query
+				      , 0
+				      , 0
+				      , s_s->album_index
+				      , s_s->album_nbr
+				      , s_s->artist_index
+				      , s_s->artist_nbr
+				      , 0
+				      , 0
+				      , 0
+				      , &spotify_cb_search_complete
+				      , s_s);
+
+
+	    /* sp_search* sp_search_create	(	sp_session * 	session, */
+	    /* 					const char * 	query, */
+	    /* 					int 	track_offset, */
+	    /* 					int 	track_count, */
+	    /* 					int 	album_offset, */
+	    /* 					int 	album_count, */
+	    /* 					int 	artist_offset, */
+	    /* 					int 	artist_count, */
+	    /* 					int 	playlist_offset, */
+	    /* 					int 	playlist_count, */
+	    /* 					sp_search_type 	search_type, */
+	    /* 					search_complete_cb * 	callback, */
+	    /* 					void * 	userdata	  */
+	    /* 					)	 */
 
 	    if (!search) {
 	      error = 6;
